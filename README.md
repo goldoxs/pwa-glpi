@@ -1,4 +1,4 @@
-# PWA GLPI — v4
+# PWA GLPI
 
 Application d'inventaire physique GLPI. Version 4 — v3 + **double mode sur la page Scan QR** (Inventaire / Manuel via QR) + **toast de confirmation** après chaque opération d'écriture + **export des logs** en fichier `.txt`. Tokens GLPI jamais présents dans le code ni dans l'image Docker (injectés au démarrage du conteneur via variables d'environnement ou Docker Swarm secrets).
 
