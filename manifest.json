@@ -1,13 +1,13 @@
 {
-  "name": "Inventaire GLPI v4.1.1",
-  "short_name": "GLPI Inventaire v4.1.1",
-  "description": "Application d'inventaire physique pour GLPI (v4.1.1 — fix Manuel via QR + toast 5s + export logs)",
+  "name": "Inventaire GLPI v2",
+  "short_name": "GLPI Inventaire v2",
+  "description": "Application d'inventaire physique pour GLPI (v2 — users_id + buy_date)",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#272758",
+  "theme_color": "#007bff",
   "icons": [
-    { "src": "logo_picto.png", "sizes": "150x150", "type": "image/png", "purpose": "any" },
-    { "src": "logo_picto.png", "sizes": "150x150", "type": "image/png", "purpose": "maskable" }
+    { "src": "logo_picto.png", "sizes": "any", "type": "image/png", "purpose": "any" },
+    { "src": "logo_picto.png", "sizes": "any", "type": "image/png", "purpose": "maskable" }
   ]
 }

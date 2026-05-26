@@ -3,21 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventaire GLPI — Recherche manuelle (v3)</title>
+    <title>Inventaire GLPI — Recherche manuelle (v2)</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/png" href="logo_picto.png">
+    <link rel="icon" type="image/png" href="logo.png">
     <link rel="apple-touch-icon" href="logo.png">
     <link rel="stylesheet" href="style.css">
-    <meta name="theme-color" content="#272758">
+    <meta name="theme-color" content="#007bff">
+    <style>
+        .card { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        button { width: 100%; padding: 10px; margin: 5px 0; border: none; border-radius: 5px; background: #007bff; color: #fff; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button.secondary { background: #6c757d; }
+        button.secondary:hover { background: #545b62; }
+        button:disabled { background: #adb5bd; cursor: not-allowed; }
+        #logs { background: #f8f9fa; border: 1px solid #ccc; padding: 10px; border-radius: 5px; height: 250px; overflow-y: auto; font-family: monospace; font-size: 12px; display: none; }
+        .log-error { color: #dc3545; }
+        .log-success { color: #28a745; }
+        .log-warning { color: #ffc107; }
+        .log-info { color: #17a2b8; }
+        #test-result { margin-top: 10px; }
+        label { display: block; margin-top: 10px; font-weight: bold; color: #333; }
+        input[type="text"], input[type="date"], select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 4px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        .info-box { margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; }
+        .field-group { margin-bottom: 10px; }
+        .inline-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+        .inline-check input[type="checkbox"] { width: auto; margin: 0; }
+    </style>
 </head>
 <body>
     <header class="app-header" role="banner">
         <a href="index.html" class="app-header__logo" aria-label="Retour à l'accueil">
-            <img data-branding="picto" src="logo_picto.png" alt="">
-            <span data-branding="app-name" class="app-header__logo-text">Solution d'inventaire</span>
+            <img src="logo_picto.png" alt="Your Company">
+            <span class="app-header__logo-text">Solution d'inventaire</span>
         </a>
         <h1 class="app-header__title">Recherche manuelle</h1>
-        <a data-branding="glpi-url" href="https://your-glpi.example.com/" class="app-header__glpi"
+        <a href="https://your-glpi.example.com/" class="app-header__glpi"
            target="_blank" rel="noopener"
            aria-label="Ouvrir le support GLPI (nouvel onglet)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -30,76 +58,58 @@
         </a>
     </header>
 
-    <main class="app-main" role="main">
-        <h2 class="page-title">Recherche manuelle</h2>
-        <p class="page-subtitle">Saisissez le numéro de série si le scan QR ne fonctionne pas.</p>
+    <div class="card">
+        <label for="serialNumber">Numéro de série :</label>
+        <input type="text" id="serialNumber" value="" placeholder="Entrez le numéro de série">
 
-        <div class="card">
-            <div class="field">
-                <label class="field__label" for="serialNumber">Numéro de série</label>
-                <input type="text" id="serialNumber" class="input" value="" placeholder="Ex : CZC1234ABC" autocomplete="off">
-                <span class="field__hint">Insensible à la casse. Tous types (Computer, Monitor, ...).</span>
-            </div>
+        <button id="search-btn">Rechercher</button>
 
-            <div class="btn-group">
-                <button type="button" id="search-btn" class="btn btn--primary">Rechercher</button>
-            </div>
-
-            <div id="test-result" class="mt-4"></div>
-            <div id="result" class="result result--info mt-4" role="status" aria-live="polite">
-                <p>Saisissez un numéro de série puis cliquez sur « Rechercher ».</p>
-            </div>
-
-            <!-- Formulaire d'édition, affiché après une recherche réussie -->
-            <div id="edit-form" class="hidden mt-4">
-                <div class="field">
-                    <label class="field__label" for="usersSelect">Utilisateur associé</label>
-                    <select id="usersSelect" class="input">
-                        <option value="0">— Aucun —</option>
-                    </select>
-                </div>
-
-                <div class="field">
-                    <label class="field__label" for="dateBuy">Date d'achat</label>
-                    <input type="date" id="dateBuy" class="input">
-                </div>
-
-                <div class="field">
-                    <label class="inline-check">
-                        <input type="checkbox" id="updateInventoryDate" checked>
-                        Mettre à jour la date d'inventaire (aujourd'hui)
-                    </label>
-                </div>
-
-                <div class="btn-group">
-                    <button type="button" id="save-btn" class="btn btn--accent">Enregistrer les modifications</button>
-                    <button type="button" id="reset-btn" class="btn btn--secondary">Nouvelle recherche</button>
-                </div>
-            </div>
-
-            <div class="btn-group mt-4">
-                <a href="index.html" class="btn btn--secondary">Mise à jour via QR Code</a>
-                <button type="button" id="toggle-logs" class="btn btn--ghost">Afficher / Masquer Logs</button>
-                <button type="button" id="download-logs" class="btn btn--ghost">Télécharger les logs</button>
-                <button type="button" id="clear-logs" class="btn btn--danger">Effacer les logs</button>
-            </div>
+        <div id="test-result"></div>
+        <div id="result">
+            <p>Saisissez un numéro de série puis cliquez sur « Rechercher ».</p>
         </div>
 
-        <div class="card">
-            <h3 class="card__title">Logs détaillés</h3>
-            <div id="logs" class="logs" role="log" aria-live="polite" style="display:none;"></div>
-        </div>
-    </main>
+        <!-- Formulaire d'édition, affiché après une recherche réussie -->
+        <div id="edit-form" class="hidden">
+            <div class="field-group">
+                <label for="usersSelect">Utilisateur associé :</label>
+                <select id="usersSelect">
+                    <option value="0">— Aucun —</option>
+                </select>
+            </div>
 
-    <!-- v4.1 : hôte du toast de confirmation (géré par showToast/closeToast dans app_multi_v2.js) -->
-    <div id="toast-host" class="toast-host" aria-live="assertive" aria-atomic="true" hidden></div>
+            <div class="field-group">
+                <label for="dateBuy">Date d'achat :</label>
+                <input type="date" id="dateBuy">
+            </div>
+
+            <div class="field-group">
+                <label class="inline-check">
+                    <input type="checkbox" id="updateInventoryDate" checked>
+                    Mettre à jour la date d'inventaire (aujourd'hui)
+                </label>
+            </div>
+
+            <button id="save-btn">Enregistrer les modifications</button>
+            <button id="reset-btn" class="secondary">Nouvelle recherche</button>
+        </div>
+
+        <button onclick="window.location.href='index.html'">Mise à jour via QR Code</button>
+        <button id="toggle-logs">Afficher / Masquer Logs</button>
+        <button id="clear-logs">Effacer les logs</button>
+    </div>
+
+    <div class="card">
+        <h3>Logs détaillés</h3>
+        <div id="logs"></div>
+    </div>
 
     <script src="config.js"></script>
     <script src="app_multi_v2.js"></script>
     <script>
-        // Enregistrement du service worker v3
+        // Enregistrement du service worker v2
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW v3 non enregistré', err));
+            navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW v2 non enregistré', err));
         }
 
         // État courant de l'équipement recherché
@@ -117,19 +127,17 @@
         const resEl       = document.getElementById("result");
 
         function showMessage(type, text) {
-            const cls = {
-                success: "result result--success",
-                error:   "result result--error",
-                info:    "result result--info",
-                warning: "result result--warning"
-            }[type] || "result";
-            out.innerHTML = `<div class="${cls}" role="status">${text}</div>`;
+            const colors = {
+                success: { bg: "#d4edda", fg: "#155724" },
+                error:   { bg: "#f8d7da", fg: "#721c24" },
+                info:    { bg: "#d1ecf1", fg: "#0c5460" }
+            }[type] || { bg: "#eee", fg: "#333" };
+            out.innerHTML = `<div style="background:${colors.bg};color:${colors.fg};padding:10px;border-radius:5px;">${text}</div>`;
         }
 
         function resetForm() {
             currentEquip = null;
             editForm.classList.add("hidden");
-            resEl.className = "result result--info mt-4";
             resEl.innerHTML = `<p>Saisissez un numéro de série puis cliquez sur « Rechercher ».</p>`;
             out.innerHTML = "";
             serialInput.value = "";
@@ -165,35 +173,22 @@
 
         function renderEquipmentInfo(eq) {
             const inv = eq.infocom || {};
-            resEl.className = "result mt-4";
             resEl.innerHTML = `
-                <div class="result__header">Détails de l'équipement
-                    <span class="badge badge--info" style="margin-left:auto">${eq.type}</span>
+                <div class="info-box">
+                    <p><b>Type :</b> ${eq.type}</p>
+                    <p><b>Nom :</b> ${eq.name}</p>
+                    <p><b>N° de série :</b> ${eq.serial || "—"}</p>
+                    <p><b>Dernier inventaire :</b> ${eq.lastInventory || "Jamais"}</p>
+                    <p><b>Date d'achat actuelle :</b> ${inv.buy_date || "Non renseignée"}</p>
+                    <p><b>Infocom ID :</b> ${inv.id || "—"}</p>
                 </div>
-                <dl>
-                    <dt>Nom</dt><dd>${eq.name}</dd>
-                    <dt>N° de série</dt><dd>${eq.serial || "—"}</dd>
-                    <dt>Dernier inventaire</dt><dd>${eq.lastInventory || "Jamais"}</dd>
-                    <dt>Date d'achat actuelle</dt><dd>${inv.buy_date || "Non renseignée"}</dd>
-                    <dt>Infocom ID</dt><dd>${inv.id || "—"}</dd>
-                </dl>
-                <div id="test-result"></div>
             `;
         }
 
         document.getElementById("clear-logs").addEventListener("click", () => {
-            if (typeof window.clearAllLogs === "function") window.clearAllLogs();
-            const t = document.getElementById("test-result");
-            if (t) t.innerHTML = "";
+            document.getElementById("logs").innerHTML = "";
+            out.innerHTML = "";
         });
-
-        const dlBtn = document.getElementById("download-logs");
-        if (dlBtn) dlBtn.addEventListener("click", () => {
-            if (typeof window.downloadLogs === "function") window.downloadLogs();
-        });
-
-        // NB : le listener "toggle-logs" est fourni par app_multi_v2.js.
-        // On ne le duplique PAS ici sinon les deux toggles s'annulent.
 
         resetBtn.addEventListener("click", resetForm);
 
@@ -275,15 +270,14 @@
                     actions.push({ what: "infocom", ok: false, reason: "no_infocom" });
                 }
 
-                let allOk = true;
                 if (actions.length === 0) {
                     showMessage("info", "ℹ️ Aucune modification à enregistrer");
                 } else {
-                    allOk = actions.every(a => a.ok);
+                    const allOk = actions.every(a => a.ok);
                     if (allOk) {
                         showMessage("success", `✅ Modifications enregistrées pour ${eq.name}`);
                     } else {
-                        showMessage("warning", `⚠️ Enregistrement partiel — consultez les logs`);
+                        showMessage("error", `⚠️ Enregistrement partiel — consultez les logs`);
                     }
                 }
 
@@ -298,33 +292,9 @@
                     await populateUsersSelect(curUid);
                     dateBuyIn.value = toInputDate(refreshed.infocom && refreshed.infocom.buy_date);
                 }
-
-                // v4.1 : toast de confirmation (seulement si au moins une action d'écriture)
-                if (actions.length > 0) {
-                    if (allOk) {
-                        window.showToast && window.showToast("success", "Mise à jour OK", {
-                            desc: `Modifications enregistrées pour ${eq.name}`,
-                            autoCloseMs: 5000,
-                            onClose: () => {
-                                // Clear + focus sur le champ série pour la saisie suivante
-                                serialInput.value = "";
-                                try { serialInput.focus({ preventScroll: true }); }
-                                catch(_) { serialInput.focus(); }
-                            }
-                        });
-                    } else {
-                        const failed = actions.filter(a => !a.ok).map(a => a.what).join(", ");
-                        window.showToast && window.showToast("error", "Enregistrement partiel", {
-                            desc: `Échec sur : ${failed || "opérations multiples"} — voir les logs`
-                        });
-                    }
-                }
             } catch (e) {
                 log("error", "Erreur enregistrement", e.message || e);
                 showMessage("error", `❌ Erreur : ${e.message || e}`);
-                window.showToast && window.showToast("error", "Erreur réseau", {
-                    desc: `Impossible d'enregistrer : ${e.message || e}`
-                });
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.textContent = "Enregistrer les modifications";

@@ -1,11 +1,10 @@
-const CACHE_NAME = 'inventory-app-cache-v7-v4-toast-hotfix';
+const CACHE_NAME = 'inventory-app-cache-v5-v2-p0-fixes';
 const urlsToCache = [
   './',
   './index.html',
   './recherche_manuelle.html',
   './app_multi_v2.js',
   './config.js',
-  './branding.js',
   './style.css',
   './manifest.json',
   './logo.png',
@@ -32,7 +31,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Requêtes API GLPI → toujours réseau (pas de cache)
+  // Requêtes API GLPI -> toujours réseau (pas de cache)
   if (url.origin === "https://your-glpi.example.com") {
     event.respondWith(fetch(event.request));
     return;
