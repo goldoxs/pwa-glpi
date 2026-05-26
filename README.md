@@ -1,33 +1,106 @@
-# PWA GLPI — Inventory scanner
+# PWA GLPI — v4
 
-Progressive Web App pour l'inventaire physique GLPI. Scannez un QR Code sur un équipement avec votre téléphone et la date d'inventaire du matériel correspondant dans GLPI est automatiquement mise à jour (champ `inventory_date` de la relation Infocom). Fonctionne en HTTPS depuis n'importe quel navigateur mobile récent, installable en PWA, avec un cache offline pour le shell de l'application.
+Application d'inventaire physique GLPI. Version 4 — v3 + **double mode sur la page Scan QR** (Inventaire / Manuel via QR) + **toast de confirmation** après chaque opération d'écriture + **export des logs** en fichier `.txt`. Tokens GLPI jamais présents dans le code ni dans l'image Docker (injectés au démarrage du conteneur via variables d'environnement ou Docker Swarm secrets).
 
-Ce dépôt contient **4 versions** progressivement enrichies, conservées comme étapes de référence pour permettre à n'importe qui de reprendre la base la plus adaptée à son contexte.
+---
 
-## Les 4 versions
+## Nouveautés v4
 
-| Version | Description | Tokens | UI |
-|---|---|---|---|
-| [**v1**](v1/) | MVP — scan QR + update `inventory_date`. Doublons de pages historiques conservés (`by_serial_number.html`, `maj_mnauelle.html`). | En clair dans `app_multi.js` | Simple (Bootstrap-like manuel) |
-| [**v2**](v2/) | Fusion des pages en `recherche_manuelle.html`. Édition `users_id` (par email) et `buy_date`. Wrapper `glpiFetch` avec retry 401. Favicon, header unifié. Tokens externalisés dans `config.js`. | `config.js` (dev) ou envsubst + env vars (prod) | Header fixe + palette `#007bff` |
-| [**v3**](v3/) | Refonte graphique complète (palette violet/cyan/orange). `branding.js` séparé pour le rebranding sans toucher au HTML. Support Docker Swarm secrets. Design mobile-first WCAG AA. | **Runtime uniquement** — env vars ou Swarm secrets. Jamais dans le code ni dans l'image. | Refonte complète, CSS variables centralisées |
-| [**v4**](v4/) | v3 + **switch Inventaire / Manuel** sur la page Scan QR (mode Manuel = le scan ouvre le formulaire d'édition). **Toast** de confirmation après chaque écriture (succès 5 s + auto-rescan, échec sticky). **Export des logs** en `.txt` + persistance localStorage. | **Runtime uniquement** — identique v3 | v3 + switch + toast modal |
+### Page Scan QR — deux modes
 
-Les versions sont indépendantes — choisissez celle qui correspond à votre niveau de besoin et dupliquez uniquement le dossier correspondant.
+Un switch `Inventaire / Manuel` apparaît au-dessus du scanner. Le choix est persisté en `localStorage`, donc chaque utilisateur retrouve son mode préféré au retour.
 
-## Quick start (v4 recommandée)
+- **Inventaire** (par défaut — comportement v1/v2/v3) : scan QR = MAJ automatique de la `inventory_date` dans GLPI. Workflow rapide pour un tour d'inventaire.
+- **Manuel** (nouveau) : scan QR = ouverture du **formulaire d'édition pré-rempli** avec l'utilisateur assigné, la date d'achat (`buy_date` sur Infocom) et une case à cocher pour la date d'inventaire. Même formulaire que `recherche_manuelle.html` mais alimenté par le scan au lieu d'un numéro saisi. Après enregistrement, les infos sont rafraîchies depuis GLPI et le formulaire reste ouvert pour retouche.
 
-```bash
-git clone https://github.com/goldoxs/pwa-glpi.git
-cd pwa-glpi/v4
+### Toast de confirmation (v4.1)
 
-# 1. Customiser branding.js (nom, logo, picto, URL GLPI)
-# 2. (Optionnel) Customiser style.css — 3 variables --brand-* en tête de fichier
+Après chaque écriture (scan en Inventaire, Enregistrer en Manuel ou sur `recherche_manuelle.html`), une pop-up modale s'affiche en bas de l'écran :
+
+- **Succès** (vert) : toast 5 s avec barre de progression → auto-close + auto-rescan (ou clear + focus sur le champ série en recherche manuelle).
+- **Échec** (rouge) : toast sticky avec bouton *Fermer* — reste jusqu'à action utilisateur.
+
+Plus besoin d'ouvrir le panneau de logs pour savoir si la MAJ a fonctionné. Délai ajustable via la constante `TOAST_AUTO_CLOSE_MS` en tête de `app_multi_v2.js`.
+
+### Export des logs (v4.1)
+
+- Buffer en mémoire **500 entrées max** miroiré dans `localStorage` (persistance inter-sessions).
+- Nouveau bouton **« Télécharger les logs »** sur les 2 pages : génère un fichier `.txt` téléchargeable avec header (timestamp, user-agent, URL, count) + toutes les entrées formatées.
+- Bouton **« Effacer les logs »** purge désormais aussi le buffer + le `localStorage` (pas seulement le DOM).
+
+---
+
+## Personnalisation (forker / rebrander)
+
+Trois zones clairement séparées :
+
+| Quoi                                    | Où                                        | Comment                                                          |
+|-----------------------------------------|-------------------------------------------|------------------------------------------------------------------|
+| **Couleurs**                            | `style.css`                               | 3 variables CSS `--brand-*` en tête de fichier                   |
+| **Logo, picto, nom, URL Support GLPI**  | `branding.js`                             | 4 champs dans `window.APP_BRANDING`                              |
+| **Tokens API GLPI**                     | Variables d'environnement / Swarm secrets | Injectés à l'exécution par `docker-entrypoint.sh` — **jamais en dur dans le code** |
+
+### Couleurs — 3 lignes
+
+En tête de `style.css`, bloc `:root` :
+
+```css
+--brand-primary:   #272758;   /* Principale : header, boutons primary, switch actif */
+--brand-accent:    #2eabe2;   /* Accent clair : focus, liens, info                   */
+--brand-highlight: #F68B1F;   /* Accent vif : CTA forts (Enregistrer)                */
 ```
 
-Ensuite, **3 façons de déployer** — au choix, selon votre environnement. Les 3 donnent le même résultat côté conteneur : un `config.js` généré au démarrage à partir du template et de vos valeurs.
+Les couleurs dérivées (hover, fonds doux, variantes "dark" pour le texte AA) sont listées juste en dessous et peuvent être ajustées si nécessaire. Tous les couples texte/fond actuels respectent **WCAG AA** (≥ 4.5:1).
 
-### Option A — `docker run` (le plus simple, 1 hôte)
+### Logo, picto, nom, URL GLPI — `branding.js`
+
+```js
+window.APP_BRANDING = {
+    APP_NAME:     "Solution d'inventaire",            // Texte du header (desktop)
+    PICTO_SRC:    "logo_picto.png",                   // Picto carré (header + favicon + icône PWA)
+    LOGO_SRC:     "logo.png",                         // Logo complet (apple-touch-icon)
+    GLPI_APP_URL: "https://your-glpi.example.com/"    // URL du bouton "Support GLPI"
+};
+```
+
+`branding.js` est chargé dans `<head>` et applique automatiquement les valeurs au chargement de la page via les attributs `data-branding="picto|app-name|glpi-url"`. Aucune modification du HTML n'est nécessaire — changez seulement `branding.js`.
+
+Remplacez `logo_picto.png` (150×150 px, carré, PNG) et `logo.png` par vos propres fichiers. Si vous gardez les mêmes noms, aucune modification de `branding.js` n'est nécessaire. Si vous changez la taille du picto, mettez à jour `manifest.json` en conséquence.
+
+### Tokens API GLPI — runtime uniquement
+
+Le `config.js` qui définit `window.GLPI_CONFIG` est **généré au démarrage du conteneur** à partir de `config.template.js` et des variables d'environnement (ou des fichiers `/run/secrets/*` si vous utilisez Docker Swarm secrets).
+
+→ Aucun token n'est présent dans le code source, ni dans l'image Docker construite.
+→ Rien à éditer avant le build.
+→ Les 3 valeurs sont fournies uniquement au `docker run` (ou par le Swarm).
+
+---
+
+## Fichiers
+
+| Fichier                    | Rôle                                                                      |
+|----------------------------|---------------------------------------------------------------------------|
+| `index.html`               | Page scan QR — **switch Inventaire / Manuel** + formulaire d'édition      |
+| `recherche_manuelle.html`  | Recherche par numéro de série (fallback hors-scan)                        |
+| `app_multi_v2.js`          | Logique métier : session GLPI, `glpiFetch` (401 retry), toast, log buffer |
+| `branding.js`              | **Personnalisation** (nom, logo, picto, URL GLPI)                         |
+| `config.template.js`       | Template (placeholders `${...}`) rempli au runtime par l'entrypoint       |
+| `docker-entrypoint.sh`     | Génère `config.js` depuis env / Swarm secrets, puis lance nginx           |
+| `Dockerfile.prod`          | Image de production — tokens injectés au démarrage                        |
+| `docker-compose.yml`       | Compose simple pour `docker compose up` (1 hôte, `.env`)                  |
+| `docker-compose.prod.yml`  | Stack Docker Swarm avec secrets chiffrés + Traefik                        |
+| `.env.example`             | Template des 3 variables GLPI_* (copier en `.env`)                        |
+| `style.css`                | **Personnalisation** + thème + styles toast + mode-switch                 |
+| `manifest.json`            | Manifest PWA v4.1.1                                                       |
+| `sw.js`                    | Service worker, cache `inventory-app-cache-v7-v4-toast-hotfix`            |
+| `logo.png`, `logo_picto.png` | Ressources graphiques                                                   |
+
+---
+
+## Déploiement
+
+### Option A — `docker run` avec env vars (test rapide, 1 hôte)
 
 ```bash
 docker build -t pwa-glpi:v4-prod -f Dockerfile.prod .
@@ -38,68 +111,71 @@ docker run -p 8085:80 \
   pwa-glpi:v4-prod
 ```
 
-### Option B — `docker compose up` (recommandé en dev/staging sur 1 hôte)
+Au démarrage, `docker-entrypoint.sh` lit les 3 valeurs, exécute `envsubst` sur `config.template.js` pour produire `config.js`, puis lance nginx. Si une variable manque, l'entrypoint échoue **avant** le démarrage avec un message explicite.
 
-Les valeurs sensibles sont rangées dans un `.env` (git-ignoré), plus propre que la CLI.
+### Option B — `docker compose up` (1 hôte, `.env` pour les secrets)
 
 ```bash
-cp .env.example .env         # puis éditer .env avec vos 3 valeurs de token API et d'url GLPI
+cp .env.example .env
+# Éditer .env avec vos valeurs (fichier git-ignoré)
 docker compose up -d --build
 ```
 
-Le fichier [`docker-compose.yml`](v4/docker-compose.yml) construit l'image depuis `Dockerfile.prod` et injecte les 3 variables depuis `.env`. Healthcheck + `restart: unless-stopped` inclus.
+Équivalent à l'Option A mais plus propre pour itérer (pas de ligne de commande à rallonge, secrets hors du shell history).
 
-### Option C — `docker stack deploy` sur Docker Swarm (recommandé en prod multi-nœuds)
+### Option C — Docker Swarm secrets (prod multi-nœuds)
 
-Tokens stockés comme **Docker Swarm secrets**.
+Créer les secrets sur le manager :
 
 ```bash
-# One-time : créer les 3 secrets
 printf 'https://your-glpi.example.com/apirest.php/' | docker secret create pwa_glpi_api_url -
 printf 'your-app-token'  | docker secret create pwa_glpi_app_token -
 printf 'your-user-token' | docker secret create pwa_glpi_user_token -
+```
 
-# Déployer la stack avec Traefik, healthcheck, rollback auto
+Puis déployer la stack (remplacer `your-registry.example.com/pwa-glpi:v4-prod` par votre image poussée sur votre registry) :
+
+```bash
 docker stack deploy -c docker-compose.prod.yml pwa-glpi
 ```
 
-Le compose [`docker-compose.prod.yml`](v4/docker-compose.prod.yml) inclut les labels Traefik (routing HTTP + TLS via `traefik-public`), la politique de rolling update (`start-first`) et le rollback automatique en cas d'échec du healthcheck.
+`docker-entrypoint.sh` détecte les fichiers dans `/run/secrets/` et leur donne priorité sur les variables d'environnement. Les secrets Swarm sont chiffrés dans le Raft log, montés en `tmpfs` (jamais sur disque hôte) et invisibles dans `docker inspect`.
 
-Pour v1, v2 et v3, voir leur README respectif — mêmes principes, moins de features.
+### Rotation des tokens
 
-## Customisation — récapitulatif
+Les secrets Swarm sont immuables. Pour faire tourner un token :
 
-| Élément | v1 | v2 | v3 | v4 |
-|---|---|---|---|---|
-| **URL GLPI + tokens** | `app_multi.js` (bloc `GLPI_CONFIG` en tête) | `config.js` ou env vars via `Dockerfile.prod` | **Env vars ou Swarm secrets via `Dockerfile.prod`** (jamais en dur) | Identique v3 |
-| **Logo complet** | `logo.png` (~200 px de large) | `logo.png` (apple-touch-icon) | `logo.png`, chemin défini dans `branding.js` | Identique v3 |
-| **Pictogramme carré** | — | `logo_picto.png` (favicon + icône PWA, `sizes: any`) | `logo_picto.png` (150×150 px idéalement), chemin dans `branding.js` | Identique v3 |
-| **Couleurs** | En dur dans `style.css` et chaque HTML (palette `#007bff`) | En dur dans `style.css` (palette `#007bff`) | 3 variables CSS `--brand-*` en tête de `style.css` | Identique v3 |
-| **URL "Support GLPI"** | En dur dans le HTML de chaque page | En dur dans le header de chaque HTML | Champ `GLPI_APP_URL` dans `branding.js` | Identique v3 |
-| **Nom de l'app affiché** | En dur dans les `<h1>` | En dur dans `<span class="app-header__logo-text">` | Champ `APP_NAME` dans `branding.js` | Identique v3 |
-| **Délai toast** | — | — | — | `TOAST_AUTO_CLOSE_MS` en tête de `app_multi_v2.js` (défaut 5 s) |
+```bash
+# 1. Créer le nouveau secret avec un suffixe
+printf 'nouveau-token' | docker secret create pwa_glpi_app_token_v2 -
+
+# 2. Mettre à jour le compose pour pointer sur le nouveau secret, puis redeploy
+docker stack deploy -c docker-compose.prod.yml pwa-glpi
+
+# 3. Une fois validé, supprimer l'ancien
+docker secret rm pwa_glpi_app_token
+```
+
+---
+
+## Différences v3 → v4
+
+- **Double mode sur la page Scan QR** : switch Inventaire / Manuel, persisté en `localStorage`.
+- Scan en mode Manuel → affichage direct du formulaire d'édition (users_id, buy_date, inventory_date).
+- **Toast de confirmation** (v4.1) : succès vert 5 s + auto-rescan / échec rouge sticky.
+- **Export de logs** (v4.1) : buffer persistant + bouton « Télécharger les logs » .txt.
+- Fonctions `populateUsersSelect` / `renderEquipmentInfo` factorisées dans `app_multi_v2.js` pour être partagées entre `index.html` et `recherche_manuelle.html`.
+- Header mobile : pastille "Support GLPI" en mode icon-only sous 640 px (fix du débordement v2).
+- Bouton « Mise à jour manuelle » renommé en « Recherche par numéro de série » (la fonction est désormais accessible par scan aussi).
+- **Aucune rupture fonctionnelle** — le mode par défaut reste `Inventaire` avec le comportement historique.
+- Cache service worker : `inventory-app-cache-v7-v4-toast-hotfix`.
+
+---
 
 ## Prérequis GLPI
 
-Côté GLPI, vous devez :
-
-1. **Activer l'API REST** : Configuration → Général → API → "Enable Rest API" + "Enable login with external token".
-2. **Créer un App-Token** : Configuration → Général → API → "Add API client" → noter l'App-Token généré.
-3. **Créer un utilisateur technique** : un compte dédié à la PWA, avec un User-Token (Préférences de cet utilisateur → "Remote access keys").
-4. **Droits sur le profil** de cet utilisateur :
-   - `read` sur `User` (pour `/search/User` — nécessaire en v2/v3 pour la liste déroulante)
-   - `read/write` sur `Computer`, `Monitor`, `Peripheral`, `NetworkEquipment`, `Phone`
-   - `read/write` sur `Infocom`
-5. **CORS** : si la PWA est servie depuis un domaine différent de GLPI, configurez les en-têtes CORS côté GLPI ou via un reverse proxy.
-
-## Ajout des logos
-
-Dans le dossier de la version, placé un fichier logo_picto.png & un fichier logo.png
-
-## Contributing
-
-Issues et pull requests bienvenus. Merci de préciser dans l'issue / la PR la version concernée (v1, v2, v3 ou v4) — les 4 cohabitent et sont maintenues en l'état pour préserver la lisibilité de l'évolution.
-
-## License
-
-Distribué sous licence [MIT](LICENSE). Remplacez `Your Name` par votre nom / votre organisation lors du fork.
+- Utilisateur technique avec droits :
+  - `read/write` sur `Computer`, `Monitor`, `Peripheral`, `NetworkEquipment`, `Phone`
+  - `read/write` sur `Infocom`
+  - `read` sur `User` (pour `/search/User` et `/listSearchOptions/User`)
+- App-Token + User-Token créés dans GLPI → Configuration → Général → API.
