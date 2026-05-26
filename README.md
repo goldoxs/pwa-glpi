@@ -18,7 +18,7 @@ Les versions sont indépendantes — choisissez celle qui correspond à votre ni
 ## Quick start (v4 recommandée)
 
 ```bash
-git clone https://github.com/your-org/pwa-glpi.git
+git clone https://github.com/goldoxs/pwa-glpi.git
 cd pwa-glpi/v4
 
 # 1. Customiser branding.js (nom, logo, picto, URL GLPI)
