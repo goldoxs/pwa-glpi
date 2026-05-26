@@ -92,6 +92,10 @@ Côté GLPI, vous devez :
    - `read/write` sur `Infocom`
 5. **CORS** : si la PWA est servie depuis un domaine différent de GLPI, configurez les en-têtes CORS côté GLPI ou via un reverse proxy.
 
+## Ajout des logos
+
+Dans le dossier de la version, placé un fichier logo_picto.png & un fichier logo.png
+
 ## Contributing
 
 Issues et pull requests bienvenus. Merci de préciser dans l'issue / la PR la version concernée (v1, v2, v3 ou v4) — les 4 cohabitent et sont maintenues en l'état pour préserver la lisibilité de l'évolution.
