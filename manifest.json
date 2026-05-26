@@ -1,7 +1,7 @@
 {
-  "name": "Inventaire GLPI v4.1.1",
-  "short_name": "GLPI Inventaire v4.1.1",
-  "description": "Application d'inventaire physique pour GLPI (v4.1.1 — fix Manuel via QR + toast 5s + export logs)",
+  "name": "Inventaire GLPI v3",
+  "short_name": "GLPI Inventaire v3",
+  "description": "Application d'inventaire physique pour GLPI (v3 — refonte graphique, palette personnalisable)",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",

@@ -1,8 +1,9 @@
-# Fichiers non servis par nginx (mais conservés dans le build context pour le
-# Dockerfile.prod — l'entrypoint et le template sont copiés hors de html/).
-Dockerfile
+# Fichiers présents dans le build context mais non servis par nginx.
+# L'entrypoint et le template restent dans le context car le Dockerfile.prod
+# les COPY hors de /usr/share/nginx/html/.
+Dockerfile.prod
 .dockerignore
 README.md
-REVIEW.md
+docker-compose.prod.yml
 .git
 .gitignore

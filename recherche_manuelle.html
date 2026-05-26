@@ -8,6 +8,7 @@
     <link rel="icon" type="image/png" href="logo_picto.png">
     <link rel="apple-touch-icon" href="logo.png">
     <link rel="stylesheet" href="style.css">
+    <script src="branding.js"></script>
     <meta name="theme-color" content="#272758">
 </head>
 <body>
@@ -80,7 +81,6 @@
             <div class="btn-group mt-4">
                 <a href="index.html" class="btn btn--secondary">Mise à jour via QR Code</a>
                 <button type="button" id="toggle-logs" class="btn btn--ghost">Afficher / Masquer Logs</button>
-                <button type="button" id="download-logs" class="btn btn--ghost">Télécharger les logs</button>
                 <button type="button" id="clear-logs" class="btn btn--danger">Effacer les logs</button>
             </div>
         </div>
@@ -90,9 +90,6 @@
             <div id="logs" class="logs" role="log" aria-live="polite" style="display:none;"></div>
         </div>
     </main>
-
-    <!-- v4.1 : hôte du toast de confirmation (géré par showToast/closeToast dans app_multi_v2.js) -->
-    <div id="toast-host" class="toast-host" aria-live="assertive" aria-atomic="true" hidden></div>
 
     <script src="config.js"></script>
     <script src="app_multi_v2.js"></script>
@@ -177,19 +174,12 @@
                     <dt>Date d'achat actuelle</dt><dd>${inv.buy_date || "Non renseignée"}</dd>
                     <dt>Infocom ID</dt><dd>${inv.id || "—"}</dd>
                 </dl>
-                <div id="test-result"></div>
             `;
         }
 
         document.getElementById("clear-logs").addEventListener("click", () => {
-            if (typeof window.clearAllLogs === "function") window.clearAllLogs();
-            const t = document.getElementById("test-result");
-            if (t) t.innerHTML = "";
-        });
-
-        const dlBtn = document.getElementById("download-logs");
-        if (dlBtn) dlBtn.addEventListener("click", () => {
-            if (typeof window.downloadLogs === "function") window.downloadLogs();
+            document.getElementById("logs").innerHTML = "";
+            out.innerHTML = "";
         });
 
         // NB : le listener "toggle-logs" est fourni par app_multi_v2.js.
@@ -275,11 +265,10 @@
                     actions.push({ what: "infocom", ok: false, reason: "no_infocom" });
                 }
 
-                let allOk = true;
                 if (actions.length === 0) {
                     showMessage("info", "ℹ️ Aucune modification à enregistrer");
                 } else {
-                    allOk = actions.every(a => a.ok);
+                    const allOk = actions.every(a => a.ok);
                     if (allOk) {
                         showMessage("success", `✅ Modifications enregistrées pour ${eq.name}`);
                     } else {
@@ -298,33 +287,9 @@
                     await populateUsersSelect(curUid);
                     dateBuyIn.value = toInputDate(refreshed.infocom && refreshed.infocom.buy_date);
                 }
-
-                // v4.1 : toast de confirmation (seulement si au moins une action d'écriture)
-                if (actions.length > 0) {
-                    if (allOk) {
-                        window.showToast && window.showToast("success", "Mise à jour OK", {
-                            desc: `Modifications enregistrées pour ${eq.name}`,
-                            autoCloseMs: 5000,
-                            onClose: () => {
-                                // Clear + focus sur le champ série pour la saisie suivante
-                                serialInput.value = "";
-                                try { serialInput.focus({ preventScroll: true }); }
-                                catch(_) { serialInput.focus(); }
-                            }
-                        });
-                    } else {
-                        const failed = actions.filter(a => !a.ok).map(a => a.what).join(", ");
-                        window.showToast && window.showToast("error", "Enregistrement partiel", {
-                            desc: `Échec sur : ${failed || "opérations multiples"} — voir les logs`
-                        });
-                    }
-                }
             } catch (e) {
                 log("error", "Erreur enregistrement", e.message || e);
                 showMessage("error", `❌ Erreur : ${e.message || e}`);
-                window.showToast && window.showToast("error", "Erreur réseau", {
-                    desc: `Impossible d'enregistrer : ${e.message || e}`
-                });
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.textContent = "Enregistrer les modifications";

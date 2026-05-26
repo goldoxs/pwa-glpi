@@ -33,173 +33,13 @@ function getLogsElement() { return document.getElementById("logs"); }
 function getResultElement() { return document.getElementById("result"); }
 
 // ============================
-// v4.1 : Toast de confirmation (pop-up après opération d'écriture)
+// Logging
 // ============================
-// Délai par défaut avant auto-close d'un toast succès (réglable ici).
-const TOAST_AUTO_CLOSE_MS = 5000;
-
-// API : showToast(level, title, { desc, autoCloseMs, onClose })
-//   level       : "success" | "error"
-//   title       : texte en gras (ex: "Mise à jour OK")
-//   desc        : ligne descriptive (ex: nom de l'équipement)
-//   autoCloseMs : en ms, déclenche la fermeture + onClose automatiquement (success)
-//   onClose     : callback invoqué à la fermeture (auto ou manuelle)
-//
-// Un seul toast visible à la fois. Si un autre est déjà affiché, il est remplacé.
-const TOAST_SVG = {
-    success: '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>',
-    error:   '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6"/><path d="M9 9l6 6"/></svg>'
-};
-
-let _toastState = {
-    timer: null,
-    raf: null,
-    onClose: null,
-    closing: false
-};
-
-function _clearToastTimers() {
-    if (_toastState.timer) { clearTimeout(_toastState.timer); _toastState.timer = null; }
-    if (_toastState.raf)   { cancelAnimationFrame(_toastState.raf); _toastState.raf = null; }
-}
-
-// Ferme le toast visible (auto ou manuelle) — exécute onClose une seule fois.
-function closeToast(reason) {
-    const host = document.getElementById("toast-host");
-    if (!host || _toastState.closing) return;
-    _toastState.closing = true;
-    _clearToastTimers();
-
-    const toast = host.querySelector(".toast");
-    const cb = _toastState.onClose;
-    _toastState.onClose = null;
-
-    const finalize = () => {
-        host.innerHTML = "";
-        host.setAttribute("hidden", "");
-        _toastState.closing = false;
-        if (typeof cb === "function") {
-            try { cb(reason || "manual"); } catch (e) { log("warning", "toast onClose error", e.message || e); }
-        }
-    };
-
-    if (!toast) { finalize(); return; }
-    toast.classList.add("toast--closing");
-    // durée CSS = 200ms — on nettoie juste après
-    setTimeout(finalize, 220);
-}
-
-function showToast(level, title, options = {}) {
-    const host = document.getElementById("toast-host");
-    if (!host) {
-        log("warning", "toast-host absent — fallback console");
-        console.log(`[toast:${level}] ${title}`, options);
-        return;
-    }
-
-    // Si un toast est déjà visible, on le remplace proprement (sans rejouer onClose)
-    if (!host.hasAttribute("hidden")) {
-        _clearToastTimers();
-        _toastState.onClose = null;
-        host.innerHTML = "";
-    }
-    _toastState.closing = false;
-
-    const safeLevel = (level === "error") ? "error" : "success";
-    const desc = options.desc || "";
-    const autoCloseMs = (safeLevel === "success" && typeof options.autoCloseMs === "number")
-        ? options.autoCloseMs : null;
-    _toastState.onClose = typeof options.onClose === "function" ? options.onClose : null;
-
-    const toast = document.createElement("div");
-    toast.className = `toast toast--${safeLevel}`;
-    toast.setAttribute("role", "alert");
-    toast.setAttribute("aria-live", "assertive");
-    toast.innerHTML = `
-        <div class="toast__icon" aria-hidden="true">${TOAST_SVG[safeLevel]}</div>
-        <div class="toast__body">
-            <div class="toast__title"></div>
-            <div class="toast__desc"></div>
-        </div>
-        <button type="button" class="toast__close" aria-label="Fermer la notification">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M18 6L6 18"/><path d="M6 6l12 12"/>
-            </svg>
-        </button>
-        ${autoCloseMs ? '<div class="toast__progress"><div class="toast__progress-bar"></div></div>' : ''}
-    `;
-    // textContent pour éviter toute injection HTML côté title/desc
-    toast.querySelector(".toast__title").textContent = title || "";
-    const descEl = toast.querySelector(".toast__desc");
-    if (desc) descEl.textContent = desc; else descEl.remove();
-
-    host.appendChild(toast);
-    host.removeAttribute("hidden");
-
-    const closeBtn = toast.querySelector(".toast__close");
-    closeBtn.addEventListener("click", () => closeToast("manual"));
-
-    // Focus transféré sur "Fermer" à l'apparition (accessibilité)
-    setTimeout(() => { try { closeBtn.focus({ preventScroll: true }); } catch(_) { closeBtn.focus(); } }, 50);
-
-    if (autoCloseMs) {
-        const bar = toast.querySelector(".toast__progress-bar");
-        const start = performance.now();
-        const tick = (now) => {
-            const elapsed = now - start;
-            const pct = Math.max(0, 1 - elapsed / autoCloseMs);
-            if (bar) bar.style.transform = `scaleX(${pct})`;
-            if (elapsed < autoCloseMs) {
-                _toastState.raf = requestAnimationFrame(tick);
-            }
-        };
-        _toastState.raf = requestAnimationFrame(tick);
-        _toastState.timer = setTimeout(() => closeToast("auto"), autoCloseMs);
-    }
-}
-
-// Exposition globale (utilisée par recherche_manuelle.html)
-window.showToast = showToast;
-window.closeToast = closeToast;
-
-// ============================
-// Logging + persistance locale (v4.1.1)
-// ============================
-// Tous les appels log() sont :
-//   1) affichés en console navigateur
-//   2) ajoutés à un buffer mémoire, miroré dans localStorage (ring 500 entrées)
-//   3) ajoutés au DOM (#logs)
-// Le buffer est téléchargeable à la demande via downloadLogs() — permet de
-// récupérer toutes les traces (y compris issues des sessions précédentes).
-const LOG_STORAGE_KEY = "pwa-glpi-log-buffer";
-const LOG_MAX_ENTRIES = 500;
-let _logBuffer = [];
-try {
-    const stored = localStorage.getItem(LOG_STORAGE_KEY);
-    if (stored) _logBuffer = JSON.parse(stored) || [];
-} catch (_) { _logBuffer = []; }
-
-function _persistLogBuffer() {
-    try { localStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(_logBuffer)); }
-    catch (_) { /* quota / privacy mode — best effort */ }
-}
-
 function log(level, message, data = null) {
     const timestamp = new Date().toISOString();
     const entry = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
-
-    // 1 : console
     if (data) console.log(entry, data); else console.log(entry);
 
-    // 2 : buffer mémoire + localStorage (persistance inter-sessions)
-    _logBuffer.push({ ts: timestamp, level, message, data });
-    if (_logBuffer.length > LOG_MAX_ENTRIES) {
-        _logBuffer = _logBuffer.slice(-LOG_MAX_ENTRIES);
-    }
-    _persistLogBuffer();
-
-    // 3 : DOM (#logs)
     const logsEl = getLogsElement();
     if (!logsEl) return;
     const d = document.createElement("div");
@@ -209,45 +49,6 @@ function log(level, message, data = null) {
     logsEl.appendChild(d);
     logsEl.scrollTop = logsEl.scrollHeight;
 }
-
-// Télécharge tout le buffer courant (mémoire + localStorage) dans un .txt.
-function downloadLogs() {
-    const lines = _logBuffer.map(e => {
-        let row = `[${e.ts}] [${(e.level || "info").toUpperCase()}] ${e.message}`;
-        if (e.data) row += "\n    " + JSON.stringify(e.data);
-        return row;
-    });
-    const header = [
-        `# PWA-GLPI logs — export ${new Date().toISOString()}`,
-        `# entries: ${_logBuffer.length} (max buffer: ${LOG_MAX_ENTRIES})`,
-        `# user-agent: ${navigator.userAgent}`,
-        `# url: ${location.href}`,
-        ""
-    ].join("\n");
-    const blob = new Blob([header + lines.join("\n") + "\n"], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `pwa-glpi-logs-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, 100);
-    log("info", `Logs exportés (${_logBuffer.length} entrées)`);
-}
-
-// Vide le buffer (mémoire + localStorage) et le DOM.
-function clearAllLogs() {
-    _logBuffer = [];
-    try { localStorage.removeItem(LOG_STORAGE_KEY); } catch (_) {}
-    const logsEl = getLogsElement();
-    if (logsEl) logsEl.innerHTML = "";
-}
-
-window.downloadLogs = downloadLogs;
-window.clearAllLogs = clearAllLogs;
 
 // ============================
 // Session GLPI
@@ -322,9 +123,9 @@ async function searchAndUpdate(serialNumber, equipmentType) {
         `&forcedisplay[0]=1&forcedisplay[1]=2&forcedisplay[2]=5&forcedisplay[3]=125&forcedisplay[4]=7`;
 
     const resp = await glpiFetch(url);
-    if (!resp.ok) return { found: false, itemName: null, infocomOk: false };
+    if (!resp.ok) return false;
     const data = await resp.json();
-    if (!data.data || data.data.length === 0) return { found: false, itemName: null, infocomOk: false };
+    if (!data.data || data.data.length === 0) return false;
 
     const item = data.data[0];
     const itemId = item[2] || item["2"];
@@ -349,8 +150,8 @@ async function searchAndUpdate(serialNumber, equipmentType) {
         resEl.appendChild(infoDiv);
     }
 
-    const infocomOk = await updateInfocomDate(equipmentType, itemId);
-    return { found: true, itemName, infocomOk };
+    await updateInfocomDate(equipmentType, itemId);
+    return true;
 }
 
 async function updateInfocomDate(equipmentType, itemId) {
@@ -358,7 +159,7 @@ async function updateInfocomDate(equipmentType, itemId) {
     const infocom = await getInfocom(equipmentType, itemId);
     if (!infocom || !infocom.id) {
         log("warning", `Pas d'Infocom trouvé pour ${equipmentType} ${itemId}`);
-        return false;
+        return;
     }
     const infocomUrl = `${GLPI_CONFIG.URL}Infocom/${infocom.id}`;
     const today = formatDateForGLPI();
@@ -371,11 +172,9 @@ async function updateInfocomDate(equipmentType, itemId) {
 
     if (updateResp.ok) {
         log("success", `Date inventaire mise à jour pour ${equipmentType} ${itemId}`, { date: today });
-        return true;
     } else {
         const errorText = await updateResp.text();
         log("error", `Échec mise à jour Infocom pour ${equipmentType} ${itemId}: ${errorText}`);
-        return false;
     }
 }
 
@@ -623,299 +422,22 @@ async function startScanner() {
 
 async function handleSerial(serialRaw) {
     const serialNumber = serialRaw.includes("=") ? serialRaw.split("=")[1].trim() : serialRaw.trim();
-
-    // v4 : aiguillage selon le mode choisi
-    if (getScanMode() === "manuel") {
-        await handleSerialManuel(serialNumber);
-        return;
-    }
-
-    // Mode inventaire (comportement historique) : MAJ auto de inventory_date
     const types = ["Computer", "Monitor", "Peripheral", "NetworkEquipment", "Phone"];
     let found = false;
-    let infocomOk = false;
-    let foundName = null;
-    let networkError = null;
-    try {
-        for (const t of types) {
-            const res = await searchAndUpdate(serialNumber, t);
-            if (res && res.found) {
-                found = true;
-                infocomOk = !!res.infocomOk;
-                foundName = res.itemName;
-                break;
-            }
-        }
-    } catch (e) {
-        log("error", "Erreur handleSerial (inventaire)", e.message || e);
-        networkError = e.message || String(e);
+    for (const t of types) {
+        const ok = await searchAndUpdate(serialNumber, t);
+        if (ok) { found = true; break; }
     }
-
     const out = document.getElementById("test-result");
     out.innerHTML = "";
-    const success = found && infocomOk && !networkError;
-
-    if (success) {
+    if (found) {
         out.innerHTML = `<div style="background:#d4edda;color:#155724;padding:10px;border-radius:5px;">
             ✅ Inventaire mis à jour pour ${serialNumber}
         </div>`;
-        // v4.1 : toast de confirmation + auto-rescan après 10s
-        showToast("success", "Mise à jour OK", {
-            desc: `Inventaire à jour pour ${foundName || serialNumber}`,
-            autoCloseMs: TOAST_AUTO_CLOSE_MS,
-            onClose: () => {
-                const rescan = document.getElementById("rescan-button");
-                if (rescan) rescan.click();
-            }
-        });
     } else {
-        // Détermine la raison précise pour l'UX
-        let errTitle, errDesc;
-        if (networkError) {
-            errTitle = "Erreur réseau";
-            errDesc = `Impossible de contacter GLPI : ${networkError}`;
-        } else if (!found) {
-            errTitle = "Équipement introuvable";
-            errDesc = `Aucun équipement pour ${serialNumber}`;
-        } else {
-            errTitle = "Échec de la mise à jour";
-            errDesc = `Infocom non mis à jour pour ${foundName || serialNumber}`;
-        }
         out.innerHTML = `<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:5px;">
-            ❌ ${errDesc}
-        </div>`;
-        // v4.1 : toast d'échec (pas d'auto-close, reste jusqu'à fermeture manuelle)
-        showToast("error", errTitle, { desc: errDesc });
-    }
-}
-
-// ============================
-// v4 : Mode de scan (Inventaire / Manuel) + édition manuelle via QR
-// ============================
-const SCAN_MODE_KEY = "pwa-glpi-scan-mode";
-
-function getScanMode() {
-    return localStorage.getItem(SCAN_MODE_KEY) === "manuel" ? "manuel" : "inventaire";
-}
-
-function setScanMode(mode) {
-    const m = (mode === "manuel") ? "manuel" : "inventaire";
-    localStorage.setItem(SCAN_MODE_KEY, m);
-    updateScanModeUI();
-    if (m === "inventaire") resetManualForm();
-}
-
-function updateScanModeUI() {
-    const mode = getScanMode();
-    document.querySelectorAll(".mode-btn").forEach(btn => {
-        const active = btn.dataset.mode === mode;
-        btn.classList.toggle("mode-btn--active", active);
-        btn.setAttribute("aria-pressed", active ? "true" : "false");
-    });
-    const subtitle = document.getElementById("scan-subtitle");
-    if (subtitle) {
-        subtitle.textContent = (mode === "inventaire")
-            ? "Pointez le QR Code pour mettre à jour la date d'inventaire (maj automatique au scan)."
-            : "Pointez le QR Code pour éditer l'équipement (utilisateur, date d'achat, date d'inventaire).";
-    }
-}
-
-// État courant de l'équipement en cours d'édition manuelle
-let _manualCurrentEquip = null;
-
-function resetManualForm() {
-    _manualCurrentEquip = null;
-    const form = document.getElementById("manual-edit-form");
-    if (form) form.classList.add("hidden");
-}
-
-// Remplit un <select> avec la liste des utilisateurs GLPI (filtrée par email).
-// Exposée globalement pour que recherche_manuelle.html puisse aussi l'utiliser.
-async function populateUsersSelect(selectEl, selectedId, outEl) {
-    try {
-        const users = await loadGLPIUsers();
-        selectEl.innerHTML = '<option value="0">— Aucun —</option>';
-        for (const u of users) {
-            const opt = document.createElement("option");
-            opt.value = u.id;
-            opt.textContent = u.name;
-            if (selectedId && String(u.id) === String(selectedId)) opt.selected = true;
-            selectEl.appendChild(opt);
-        }
-        if (!selectedId || selectedId === 0 || selectedId === "0") {
-            selectEl.value = "0";
-        }
-        if (users.length === 0 && outEl) {
-            outEl.innerHTML = `<div style="background:#d1ecf1;color:#0c5460;padding:10px;border-radius:5px;">
-                ⚠ Liste utilisateurs vide — vérifier les droits du token sur search/User (voir logs)
-            </div>`;
-            const logs = document.getElementById("logs");
-            if (logs) logs.style.display = "block";
-        }
-    } catch (e) {
-        selectEl.innerHTML =
-            `<option value="" disabled selected>❌ ${e.message || e}</option>` +
-            `<option value="0">— Aucun —</option>`;
-        if (outEl) outEl.innerHTML = `<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:5px;">
-            ❌ Liste utilisateurs indisponible : ${e.message || e}
-        </div>`;
-        const logs = document.getElementById("logs");
-        if (logs) logs.style.display = "block";
-    }
-}
-
-// Rend les infos d'un équipement trouvé dans un élément cible.
-// IMPORTANT : on préserve/recrée le `#test-result` imbriqué car saveManualEdit
-// (et d'autres handlers) le cherchent après-coup — sinon crash "null is not an
-// object (evaluating 'out')" sur le clic Enregistrer en mode Manuel via QR.
-function renderEquipmentInfo(targetEl, eq) {
-    const inv = eq.infocom || {};
-    targetEl.innerHTML = `
-        <div class="info-box">
-            <p><b>Type :</b> ${eq.type}</p>
-            <p><b>Nom :</b> ${eq.name}</p>
-            <p><b>N° de série :</b> ${eq.serial || "—"}</p>
-            <p><b>Dernier inventaire :</b> ${eq.lastInventory || "Jamais"}</p>
-            <p><b>Date d'achat actuelle :</b> ${inv.buy_date || "Non renseignée"}</p>
-            <p><b>Infocom ID :</b> ${inv.id || "—"}</p>
-        </div>
-        <div id="test-result"></div>
-    `;
-}
-
-// Scan en mode Manuel : recherche l'équipement et affiche le formulaire d'édition.
-async function handleSerialManuel(serialNumber) {
-    const resEl = getResultElement();
-    const out = document.getElementById("test-result");
-    const form = document.getElementById("manual-edit-form");
-
-    if (out) out.innerHTML = `<div style="background:#d1ecf1;color:#0c5460;padding:10px;border-radius:5px;">🔎 Recherche ${serialNumber}…</div>`;
-
-    const eq = await findEquipment(serialNumber);
-    if (!eq) {
-        if (out) out.innerHTML = `<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:5px;">
             ❌ Aucun équipement trouvé pour ${serialNumber}
         </div>`;
-        resetManualForm();
-        return;
-    }
-
-    _manualCurrentEquip = eq;
-
-    if (resEl) renderEquipmentInfo(resEl, eq);
-
-    const usersSelect = document.getElementById("usersSelect");
-    const dateBuyIn   = document.getElementById("dateBuy");
-    const invChk      = document.getElementById("updateInventoryDate");
-
-    const itemFull = eq.full && (eq.full.users_id !== undefined ? eq.full : (eq.full[eq.type] || {}));
-    const currentUserId = itemFull && itemFull.users_id !== undefined ? itemFull.users_id : 0;
-
-    if (usersSelect) await populateUsersSelect(usersSelect, currentUserId, out);
-    if (dateBuyIn)   dateBuyIn.value = toInputDate(eq.infocom && eq.infocom.buy_date);
-    if (invChk)      invChk.checked = true;
-
-    if (form) form.classList.remove("hidden");
-
-    if (out) out.innerHTML = `<div style="background:#d1ecf1;color:#0c5460;padding:10px;border-radius:5px;">
-        ✅ ${eq.type} trouvé — modifiez les champs puis cliquez sur « Enregistrer »
-    </div>`;
-}
-
-// Enregistre les modifications du formulaire manuel pour l'équipement scanné.
-async function saveManualEdit() {
-    if (!_manualCurrentEquip) return;
-    const eq = _manualCurrentEquip;
-    const usersSelect = document.getElementById("usersSelect");
-    const dateBuyIn   = document.getElementById("dateBuy");
-    const invChk      = document.getElementById("updateInventoryDate");
-    const out         = document.getElementById("test-result");
-    const saveBtn     = document.getElementById("manual-save-btn");
-
-    const selectedUserId = usersSelect.value;
-    const dateBuy = dateBuyIn.value || null;
-    const doInv = invChk.checked;
-
-    const itemFull = eq.full && (eq.full.users_id !== undefined ? eq.full : (eq.full[eq.type] || {}));
-    const prevUserId = itemFull && itemFull.users_id !== undefined ? String(itemFull.users_id) : "0";
-    const prevDateBuy = toInputDate(eq.infocom && eq.infocom.buy_date);
-
-    try {
-        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Enregistrement…"; }
-        const actions = [];
-
-        if (String(selectedUserId) !== prevUserId) {
-            const ok = await updateItemUser(eq.type, eq.id, selectedUserId);
-            actions.push({ what: "users_id", ok });
-        }
-
-        const infocomId = eq.infocom && eq.infocom.id;
-        const dateBuyChanged = (dateBuy || "") !== (prevDateBuy || "");
-        if (infocomId && (dateBuyChanged || doInv)) {
-            const payload = {};
-            if (doInv) payload.inventoryDate = formatDateForGLPI();
-            if (dateBuyChanged) payload.dateBuy = dateBuy;
-            const ok = await updateInfocomFields(infocomId, payload);
-            actions.push({ what: "infocom", ok, payload });
-        } else if (!infocomId && (dateBuyChanged || doInv)) {
-            log("warning", "Pas d'Infocom — impossible de mettre à jour buy_date / inventory_date");
-            actions.push({ what: "infocom", ok: false, reason: "no_infocom" });
-        }
-
-        let allOk = true;
-        if (actions.length === 0) {
-            out.innerHTML = `<div style="background:#d1ecf1;color:#0c5460;padding:10px;border-radius:5px;">ℹ Aucune modification à enregistrer</div>`;
-            // Aucune opération d'écriture → pas de toast
-        } else {
-            allOk = actions.every(a => a.ok);
-            out.innerHTML = allOk
-                ? `<div style="background:#d4edda;color:#155724;padding:10px;border-radius:5px;">✅ Modifications enregistrées pour ${eq.name}</div>`
-                : `<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:5px;">⚠ Enregistrement partiel — consultez les logs</div>`;
-        }
-
-        // Rafraîchir les infos affichées
-        const refreshed = await findEquipment(eq.serial);
-        if (refreshed) {
-            _manualCurrentEquip = refreshed;
-            const resEl = getResultElement();
-            if (resEl) renderEquipmentInfo(resEl, refreshed);
-            invChk.checked = false;
-            const itemFull2 = refreshed.full && (refreshed.full.users_id !== undefined ? refreshed.full : (refreshed.full[refreshed.type] || {}));
-            const curUid = itemFull2 && itemFull2.users_id !== undefined ? itemFull2.users_id : 0;
-            await populateUsersSelect(usersSelect, curUid, out);
-            dateBuyIn.value = toInputDate(refreshed.infocom && refreshed.infocom.buy_date);
-        }
-
-        // v4.1 : toast de confirmation (seulement si au moins une action d'écriture)
-        if (actions.length > 0) {
-            if (allOk) {
-                showToast("success", "Mise à jour OK", {
-                    desc: `Modifications enregistrées pour ${eq.name}`,
-                    autoCloseMs: TOAST_AUTO_CLOSE_MS,
-                    onClose: () => {
-                        // Reset du formulaire manuel + relance scan
-                        resetManualForm();
-                        const resEl2 = document.getElementById("result");
-                        if (resEl2) resEl2.innerHTML = `<p>Scannez un code-barre...</p><div id="test-result"></div>`;
-                        const rescan = document.getElementById("rescan-button");
-                        if (rescan) rescan.click();
-                    }
-                });
-            } else {
-                const failed = actions.filter(a => !a.ok).map(a => a.what).join(", ");
-                showToast("error", "Enregistrement partiel", {
-                    desc: `Échec sur : ${failed || "opérations multiples"} — voir les logs`
-                });
-            }
-        }
-    } catch (e) {
-        log("error", "Erreur enregistrement manuel", e.message || e);
-        out.innerHTML = `<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:5px;">❌ Erreur : ${e.message || e}</div>`;
-        showToast("error", "Erreur réseau", {
-            desc: `Impossible d'enregistrer : ${e.message || e}`
-        });
-    } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Enregistrer les modifications"; }
     }
 }
 
@@ -947,25 +469,5 @@ document.addEventListener("DOMContentLoaded", () => {
             logs.style.display = isHidden ? "block" : "none";
         });
     }
-
-    // v4 : switch de mode (Inventaire / Manuel)
-    document.querySelectorAll(".mode-btn").forEach(btn => {
-        btn.addEventListener("click", () => setScanMode(btn.dataset.mode));
-    });
-    updateScanModeUI();
-
-    // v4 : boutons du formulaire d'édition manuelle via scan
-    const manualSaveBtn = document.getElementById("manual-save-btn");
-    if (manualSaveBtn) manualSaveBtn.addEventListener("click", saveManualEdit);
-
-    const manualResetBtn = document.getElementById("manual-reset-btn");
-    if (manualResetBtn) manualResetBtn.addEventListener("click", () => {
-        resetManualForm();
-        const resEl = document.getElementById("result");
-        if (resEl) resEl.innerHTML = `<p>Scannez un code-barre...</p><div id="test-result"></div>`;
-        const rescan = document.getElementById("rescan-button");
-        if (rescan && rescan.style.display !== "none") rescan.click();
-    });
-
     if (document.getElementById("video")) startScanner();
 });
