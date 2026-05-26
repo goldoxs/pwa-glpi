@@ -1,0 +1,25 @@
+# Compose "simple" pour `docker compose up` sur un seul hôte.
+# Les 3 valeurs sensibles sont chargées depuis un fichier .env (voir .env.example).
+#
+# Pour un déploiement Docker Swarm avec secrets chiffrés, utilisez plutôt
+# docker-compose.prod.yml + `docker stack deploy`.
+
+services:
+  pwa-glpi:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: pwa-glpi:v3-prod
+    ports:
+      - "8085:80"
+    environment:
+      GLPI_URL:        ${GLPI_URL}
+      GLPI_APP_TOKEN:  ${GLPI_APP_TOKEN}
+      GLPI_USER_TOKEN: ${GLPI_USER_TOKEN}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

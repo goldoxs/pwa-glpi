@@ -1,0 +1,8 @@
+# Fichiers non servis par nginx (mais conservés dans le build context pour le
+# Dockerfile.prod — l'entrypoint et le template sont copiés hors de html/).
+Dockerfile
+.dockerignore
+README.md
+REVIEW.md
+.git
+.gitignore

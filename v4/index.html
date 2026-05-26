@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventaire GLPI — v4</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="logo_picto.png">
+    <link rel="apple-touch-icon" href="logo.png">
+    <link rel="stylesheet" href="style.css">
+    <script src="branding.js"></script>
+    <meta name="theme-color" content="#272758">
+</head>
+<body>
+    <header class="app-header" role="banner">
+        <a href="index.html" class="app-header__logo" aria-label="Retour à l'accueil">
+            <img data-branding="picto" src="logo_picto.png" alt="">
+            <span data-branding="app-name" class="app-header__logo-text">Solution d'inventaire</span>
+        </a>
+        <h1 class="app-header__title">Scan QR Code</h1>
+        <a data-branding="glpi-url" href="https://your-glpi.example.com/" class="app-header__glpi"
+           target="_blank" rel="noopener"
+           aria-label="Ouvrir le support GLPI (nouvel onglet)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+            <span class="app-header__glpi-label">Support GLPI</span>
+        </a>
+    </header>
+
+    <main class="app-main" role="main">
+        <h2 class="page-title">Scannez un équipement</h2>
+        <p class="page-subtitle" id="scan-subtitle">Pointez le QR Code pour mettre à jour la date d'inventaire (maj automatique au scan).</p>
+
+        <!-- v4 : choix du mode -->
+        <div class="mode-switch" role="group" aria-label="Mode de scan">
+            <button type="button" class="mode-btn mode-btn--active" data-mode="inventaire" aria-pressed="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 11l3 3L22 4"/>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+                <span class="mode-btn__label">Inventaire</span>
+                <span class="mode-btn__hint">Scan = MAJ auto</span>
+            </button>
+            <button type="button" class="mode-btn" data-mode="manuel" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+                <span class="mode-btn__label">Manuel</span>
+                <span class="mode-btn__hint">Scan = formulaire</span>
+            </button>
+        </div>
+
+        <div class="scanner" aria-label="Flux vidéo du scanner">
+            <video id="video" autoplay playsinline></video>
+            <div class="scanner__frame" aria-hidden="true"></div>
+            <div class="scanner__hint">Centrez le QR Code dans le cadre</div>
+        </div>
+
+        <div class="result" id="result" role="status" aria-live="polite">
+            <p>Scannez un code-barre...</p>
+            <div id="test-result"></div>
+        </div>
+
+        <!-- v4 : formulaire d'édition manuelle affiché après un scan en mode Manuel -->
+        <div class="card hidden" id="manual-edit-form">
+            <h3 class="card__title">Modifier l'équipement scanné</h3>
+
+            <div class="field">
+                <label class="field__label" for="usersSelect">Utilisateur assigné</label>
+                <select id="usersSelect" class="input">
+                    <option value="0">— Aucun —</option>
+                </select>
+                <span class="field__hint">Seuls les utilisateurs GLPI avec un email renseigné apparaissent.</span>
+            </div>
+
+            <div class="field">
+                <label class="field__label" for="dateBuy">Date d'achat</label>
+                <input type="date" id="dateBuy" class="input">
+                <span class="field__hint">Laisser vide pour ne pas modifier.</span>
+            </div>
+
+            <label class="inline-check">
+                <input type="checkbox" id="updateInventoryDate" checked>
+                Mettre à jour la date d'inventaire (aujourd'hui)
+            </label>
+
+            <div class="btn-group mt-4">
+                <button type="button" id="manual-save-btn" class="btn btn--accent">
+                    Enregistrer les modifications
+                </button>
+                <button type="button" id="manual-reset-btn" class="btn btn--secondary">
+                    Annuler / Nouveau scan
+                </button>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button type="button" id="rescan-button" class="btn btn--primary" style="display:none;">
+                Scanner un autre équipement
+            </button>
+            <button type="button" id="switch-button" class="btn btn--secondary" style="display:none;">
+                Retourner la caméra
+            </button>
+            <button type="button" id="reset-permissions" class="btn btn--secondary">
+                Réinitialiser la caméra
+            </button>
+            <a href="recherche_manuelle.html" class="btn btn--accent">
+                Recherche par numéro de série
+            </a>
+            <button type="button" id="toggle-logs" class="btn btn--ghost">
+                Afficher / Masquer Logs
+            </button>
+            <button type="button" id="download-logs" class="btn btn--ghost">
+                Télécharger les logs
+            </button>
+            <button type="button" id="clear-logs" class="btn btn--danger">
+                Effacer les logs
+            </button>
+        </div>
+
+        <div class="card mt-4">
+            <h3 class="card__title">Logs détaillés</h3>
+            <div id="logs" class="logs" role="log" aria-live="polite" style="display:none;"></div>
+        </div>
+    </main>
+
+    <!-- v4.1 : hôte du toast de confirmation (géré par showToast/closeToast dans app_multi_v2.js) -->
+    <div id="toast-host" class="toast-host" aria-live="assertive" aria-atomic="true" hidden></div>
+
+    <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+    <script src="config.js"></script>
+    <script src="app_multi_v2.js"></script>
+    <script>
+        // Enregistrement du service worker v4
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW v4 non enregistré', err));
+        }
+        // v4.1.1 : clear = vide DOM + buffer mémoire + localStorage
+        document.getElementById("clear-logs").addEventListener("click", () => {
+            if (typeof window.clearAllLogs === "function") window.clearAllLogs();
+            const t = document.getElementById("test-result");
+            if (t) t.innerHTML = "";
+        });
+        // v4.1.1 : télécharger le buffer de logs en .txt
+        document.getElementById("download-logs").addEventListener("click", () => {
+            if (typeof window.downloadLogs === "function") window.downloadLogs();
+        });
+    </script>
+</body>
+</html>

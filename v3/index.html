@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventaire GLPI — v3</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="logo_picto.png">
+    <link rel="apple-touch-icon" href="logo.png">
+    <link rel="stylesheet" href="style.css">
+    <script src="branding.js"></script>
+    <meta name="theme-color" content="#272758">
+</head>
+<body>
+    <header class="app-header" role="banner">
+        <a href="index.html" class="app-header__logo" aria-label="Retour à l'accueil">
+            <img data-branding="picto" src="logo_picto.png" alt="">
+            <span data-branding="app-name" class="app-header__logo-text">Solution d'inventaire</span>
+        </a>
+        <h1 class="app-header__title">Scan QR Code</h1>
+        <a data-branding="glpi-url" href="https://your-glpi.example.com/" class="app-header__glpi"
+           target="_blank" rel="noopener"
+           aria-label="Ouvrir le support GLPI (nouvel onglet)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+            <span class="app-header__glpi-label">Support GLPI</span>
+        </a>
+    </header>
+
+    <main class="app-main" role="main">
+        <h2 class="page-title">Scannez un équipement</h2>
+        <p class="page-subtitle">Pointez le QR Code inventaire GLPI pour mettre à jour la date de dernière vue.</p>
+
+        <div class="scanner" aria-label="Flux vidéo du scanner">
+            <video id="video" autoplay playsinline></video>
+            <div class="scanner__frame" aria-hidden="true"></div>
+            <div class="scanner__hint">Centrez le QR Code dans le cadre</div>
+        </div>
+
+        <div class="result" id="result" role="status" aria-live="polite">
+            <p>Scannez un code-barre...</p>
+            <div id="test-result"></div>
+        </div>
+
+        <div class="btn-group">
+            <button type="button" id="rescan-button" class="btn btn--primary" style="display:none;">
+                Scanner un autre équipement
+            </button>
+            <button type="button" id="switch-button" class="btn btn--secondary" style="display:none;">
+                Retourner la caméra
+            </button>
+            <button type="button" id="reset-permissions" class="btn btn--secondary">
+                Réinitialiser la caméra
+            </button>
+            <a href="recherche_manuelle.html" class="btn btn--accent">
+                Mise à jour manuelle
+            </a>
+            <button type="button" id="toggle-logs" class="btn btn--ghost">
+                Afficher / Masquer Logs
+            </button>
+            <button type="button" id="clear-logs" class="btn btn--danger">
+                Effacer les logs
+            </button>
+        </div>
+
+        <div class="card mt-4">
+            <h3 class="card__title">Logs détaillés</h3>
+            <div id="logs" class="logs" role="log" aria-live="polite" style="display:none;"></div>
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+    <script src="config.js"></script>
+    <script src="app_multi_v2.js"></script>
+    <script>
+        // Enregistrement du service worker v3
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW v3 non enregistré', err));
+        }
+        document.getElementById("clear-logs").addEventListener("click", () => {
+            document.getElementById("logs").innerHTML = "";
+            const t = document.getElementById("test-result");
+            if (t) t.innerHTML = "";
+        });
+    </script>
+</body>
+</html>

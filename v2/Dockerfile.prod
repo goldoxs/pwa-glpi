@@ -1,0 +1,28 @@
+# Dockerfile de production — tokens injectés à l'exécution depuis l'environnement
+# (alternative au Dockerfile historique qui embarquait les tokens dans l'image).
+#
+# Build :
+#   docker build -t pwa-glpi:v2 -f Dockerfile.prod .
+#
+# Run :
+#   docker run -p 8085:80 \
+#     -e GLPI_URL=https://your-glpi.example.com/apirest.php/ \
+#     -e GLPI_APP_TOKEN=xxx \
+#     -e GLPI_USER_TOKEN=yyy \
+#     pwa-glpi:v2
+
+FROM nginx:stable-alpine
+
+# envsubst fait partie du paquet gettext sur Alpine
+RUN apk add --no-cache gettext
+
+COPY . /usr/share/nginx/html
+# On retire le config.js "dev" pour forcer la génération à partir du template
+RUN rm -f /usr/share/nginx/html/config.js
+
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+EXPOSE 80
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]
